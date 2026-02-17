@@ -1,0 +1,30 @@
+# Binaries / build artifacts
+/dist/
+/bin/
+/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build/test artifacts
+*.test
+*.out
+coverage.out
+
+# Local app runtime data
+/data/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Caches
+.gocache/
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/

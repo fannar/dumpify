@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dumpify</title>
+    <style>
+      :root {
+        --bg: #f6f6f1;
+        --panel: #ffffff;
+        --ink: #1a1a1a;
+        --muted: #5d5d57;
+        --accent: #1db954;
+        --border: #d6d6cf;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #f6f6f1, #ecece3);
+        color: var(--ink);
+        font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      }
+      .wrap {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 2rem 1rem 3rem;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.1rem 1.2rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 8px 30px rgba(20, 20, 20, 0.04);
+      }
+      h1 {
+        margin: 0 0 0.35rem;
+        font-size: 1.9rem;
+        letter-spacing: 0.02em;
+      }
+      p {
+        margin: 0.3rem 0;
+        color: var(--muted);
+      }
+      .btn,
+      button {
+        display: inline-block;
+        border: none;
+        border-radius: 10px;
+        padding: 0.55rem 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        margin-right: 0.4rem;
+        margin-top: 0.4rem;
+      }
+      .btn.secondary,
+      button.secondary {
+        background: #2f2f2b;
+      }
+      button[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.7rem;
+        font-size: 0.94rem;
+      }
+      th,
+      td {
+        text-align: left;
+        border-top: 1px solid var(--border);
+        padding: 0.5rem 0.3rem;
+        vertical-align: top;
+      }
+      .mono {
+        font-family: "SF Mono", "Menlo", monospace;
+        font-size: 0.9rem;
+        color: #2f2f2b;
+      }
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 20, 20, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+      }
+      .overlay.show {
+        display: flex;
+      }
+      .overlay-card {
+        width: min(760px, 100%);
+        max-height: 85vh;
+        overflow: auto;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        padding: 1.1rem;
+      }
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid #d5eadc;
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 0.5rem;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .list-wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8rem;
+        margin-top: 0.8rem;
+      }
+      .list-box {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.6rem;
+        min-height: 120px;
+      }
+      .list-box h3 {
+        margin: 0 0 0.5rem;
+        font-size: 0.95rem;
+      }
+      .list-box ul {
+        margin: 0;
+        padding-left: 1.2rem;
+        font-size: 0.9rem;
+        color: #2f2f2b;
+      }
+      .small {
+        font-size: 0.86rem;
+      }
+      @media (max-width: 720px) {
+        .list-wrap {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1>Dumpify</h1>
+        <p>Export your playlists from Spotify into JSON or CSV.</p>
+      </section>
+
+      <section class="card">
+        <h2>Connect</h2>
+        {{if .Providers}} {{range .Providers}}
+        <a class="btn" href="/auth/{{.}}/login">Connect {{.}}</a>
+        {{end}} {{else}}
+        <p>No providers configured. Set Spotify env vars first.</p>
+        {{end}} {{if .Connected}}
+        <p>Connected account:</p>
+        <p class="mono">
+          provider={{.Account.Provider}} user_id={{.Account.User.ID}}
+        </p>
+        <p class="mono">
+          granted_scopes={{if
+          .Account.Token.Scope}}{{.Account.Token.Scope}}{{else}}(unknown){{end}}
+        </p>
+        <form id="export-form" method="post" action="/export">
+          <button type="submit" data-format="json" name="format" value="json">
+            Export ALL JSON
+          </button>
+          <button
+            class="secondary"
+            type="submit"
+            data-format="csv"
+            name="format"
+            value="csv"
+          >
+            Export ALL CSV
+          </button>
+        </form>
+        {{else}}
+        <p>Connect a provider before exporting.</p>
+        {{end}}
+      </section>
+
+      <section class="card">
+        <h2>Your Playlists</h2>
+        {{if .Connected}}
+        <button id="load-playlists-btn" class="secondary" type="button">
+          Load Playlists
+        </button>
+        <p id="playlists-status" class="mono"></p>
+        <div id="playlists-wrap" style="display: none">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Owner</th>
+                <th>Type</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="playlists-body"></tbody>
+          </table>
+        </div>
+        {{else}}
+        <p>Connect a provider to list and export individual playlists.</p>
+        {{end}}
+      </section>
+
+      <section class="card">
+        <h2>Recent Exports</h2>
+        {{if .Exports}}
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Format</th>
+              <th>Created</th>
+              <th>File</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Exports}}
+            <tr>
+              <td>{{.ID}}</td>
+              <td>{{.Format}}</td>
+              <td>{{.CreatedAt.Format "2006-01-02 15:04:05 UTC"}}</td>
+              <td><a href="/downloads/{{.ID}}">download</a></td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p>No exports yet.</p>
+        {{end}}
+      </section>
+    </main>
+
+    <div
+      id="export-overlay"
+      class="overlay"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div class="overlay-card">
+        <h2><span class="spinner"></span> Export in progress</h2>
+        <p id="export-status" class="mono">Preparing export...</p>
+        <p id="export-current" class="mono"></p>
+        <p id="export-error" class="mono" style="color: #b00020"></p>
+
+        <div class="list-wrap">
+          <div class="list-box">
+            <h3>Downloaded Playlists</h3>
+            <ul id="completed-list"></ul>
+          </div>
+          <div class="list-box">
+            <h3>Skipped Playlists</h3>
+            <ul id="skipped-list"></ul>
+          </div>
+        </div>
+
+        <button id="overlay-close" class="secondary" style="display: none">
+          Close
+        </button>
+      </div>
+    </div>
+
+    <iframe
+      id="download-frame"
+      name="download-frame"
+      style="display: none"
+      title="download frame"
+    ></iframe>
+
+    <script>
+      (function () {
+        const form = document.getElementById("export-form");
+        if (!form) {
+          return;
+        }
+
+        const overlay = document.getElementById("export-overlay");
+        const statusEl = document.getElementById("export-status");
+        const currentEl = document.getElementById("export-current");
+        const errorEl = document.getElementById("export-error");
+        const completedEl = document.getElementById("completed-list");
+        const skippedEl = document.getElementById("skipped-list");
+        const closeBtn = document.getElementById("overlay-close");
+        const buttons = Array.from(
+          form.querySelectorAll("button[type='submit']"),
+        );
+
+        const loadPlaylistsBtn = document.getElementById("load-playlists-btn");
+        const playlistsStatus = document.getElementById("playlists-status");
+        const playlistsWrap = document.getElementById("playlists-wrap");
+        const playlistsBody = document.getElementById("playlists-body");
+        const downloadFrame = document.getElementById("download-frame");
+
+        let running = false;
+        let pollTimer = null;
+
+        let singlePlaylistExportRunning = false;
+        let waitingForFrameLoad = false;
+        let singleExportFallbackTimer = null;
+
+        function renderList(target, items) {
+          target.textContent = "";
+          for (const name of items) {
+            const li = document.createElement("li");
+            li.textContent = name;
+            target.appendChild(li);
+          }
+        }
+
+        function setButtonsDisabled(disabled) {
+          for (const btn of buttons) {
+            btn.disabled = disabled;
+          }
+        }
+
+        function setSinglePlaylistButtonsDisabled(disabled) {
+          const rowButtons = document.querySelectorAll("[data-single-export='1']");
+          for (const btn of rowButtons) {
+            btn.disabled = disabled;
+          }
+        }
+
+        function stopPolling() {
+          if (pollTimer !== null) {
+            window.clearInterval(pollTimer);
+            pollTimer = null;
+          }
+        }
+
+        function clearSingleExportFallbackTimer() {
+          if (singleExportFallbackTimer !== null) {
+            window.clearTimeout(singleExportFallbackTimer);
+            singleExportFallbackTimer = null;
+          }
+        }
+
+        function resetOverlay() {
+          statusEl.textContent = "Preparing export...";
+          currentEl.textContent = "";
+          errorEl.textContent = "";
+          completedEl.textContent = "";
+          skippedEl.textContent = "";
+          closeBtn.style.display = "none";
+        }
+
+        async function pollJob(jobID) {
+          const response = await fetch(
+            `/api/exports/${encodeURIComponent(jobID)}`,
+            {
+              method: "GET",
+              headers: { Accept: "application/json" },
+              credentials: "same-origin",
+              cache: "no-store",
+            },
+          );
+
+          if (!response.ok) {
+            throw new Error(`status ${response.status}`);
+          }
+
+          const job = await response.json();
+          const total = job.total_playlists || 0;
+          const completed = job.completed_playlists || 0;
+          const skipped = job.skipped_playlists || 0;
+
+          if (total > 0) {
+            statusEl.textContent = `${completed}/${total} playlists downloaded (${skipped} skipped)`;
+          } else {
+            statusEl.textContent = `Preparing playlists... (${completed} downloaded)`;
+          }
+
+          currentEl.textContent = job.current_playlist
+            ? `Current playlist: ${job.current_playlist}`
+            : "";
+
+          renderList(completedEl, job.completed_playlist_names || []);
+          renderList(skippedEl, job.skipped_playlist_names || []);
+
+          if (job.state === "done") {
+            stopPolling();
+            running = false;
+            setButtonsDisabled(false);
+            statusEl.textContent = "Export completed. Starting download...";
+            if (job.download_url) {
+              window.location.href = job.download_url;
+            }
+            window.setTimeout(function () {
+              window.location.reload();
+            }, 1200);
+            return;
+          }
+
+          if (job.state === "failed") {
+            stopPolling();
+            running = false;
+            setButtonsDisabled(false);
+            errorEl.textContent = job.error || "Export failed";
+            closeBtn.style.display = "inline-block";
+          }
+        }
+
+        async function loadPlaylists() {
+          if (!loadPlaylistsBtn || !playlistsStatus || !playlistsWrap || !playlistsBody) {
+            return;
+          }
+
+          loadPlaylistsBtn.disabled = true;
+          playlistsStatus.textContent = "Loading playlists...";
+
+          try {
+            const response = await fetch("/api/playlists", {
+              method: "GET",
+              headers: { Accept: "application/json" },
+              credentials: "same-origin",
+              cache: "no-store",
+            });
+
+            if (!response.ok) {
+              throw new Error(`status ${response.status}`);
+            }
+
+            const payload = await response.json();
+            const playlists = payload.playlists || [];
+
+            playlistsBody.textContent = "";
+            for (const pl of playlists) {
+              const tr = document.createElement("tr");
+
+              const nameTd = document.createElement("td");
+              const desc = pl.description ? ` - ${pl.description}` : "";
+              nameTd.textContent = `${pl.name || pl.id}${desc}`;
+              tr.appendChild(nameTd);
+
+              const ownerTd = document.createElement("td");
+              ownerTd.textContent = pl.owner_id || "";
+              tr.appendChild(ownerTd);
+
+              const typeTd = document.createElement("td");
+              const labels = [];
+              labels.push(pl.public ? "public" : "private");
+              if (pl.collaborative) {
+                labels.push("collaborative");
+              }
+              typeTd.textContent = labels.join(", ");
+              tr.appendChild(typeTd);
+
+              const actionsTd = document.createElement("td");
+
+              const jsonBtn = document.createElement("button");
+              jsonBtn.type = "button";
+              jsonBtn.className = "small";
+              jsonBtn.textContent = "JSON";
+              jsonBtn.dataset.singleExport = "1";
+              jsonBtn.dataset.playlistId = pl.id;
+              jsonBtn.dataset.format = "json";
+              actionsTd.appendChild(jsonBtn);
+
+              const csvBtn = document.createElement("button");
+              csvBtn.type = "button";
+              csvBtn.className = "secondary small";
+              csvBtn.textContent = "CSV";
+              csvBtn.dataset.singleExport = "1";
+              csvBtn.dataset.playlistId = pl.id;
+              csvBtn.dataset.format = "csv";
+              actionsTd.appendChild(csvBtn);
+
+              tr.appendChild(actionsTd);
+              playlistsBody.appendChild(tr);
+            }
+
+            playlistsWrap.style.display = "block";
+            playlistsStatus.textContent = `${playlists.length} playlists loaded.`;
+          } catch (error) {
+            playlistsStatus.textContent = "Failed to load playlists.";
+          } finally {
+            loadPlaylistsBtn.disabled = false;
+          }
+        }
+
+        function submitSinglePlaylistExport(playlistID, format) {
+          if (singlePlaylistExportRunning) {
+            return;
+          }
+
+          singlePlaylistExportRunning = true;
+          waitingForFrameLoad = true;
+          setSinglePlaylistButtonsDisabled(true);
+          playlistsStatus.textContent = `Starting ${format.toUpperCase()} export for playlist ${playlistID}...`;
+
+          const exportForm = document.createElement("form");
+          exportForm.method = "POST";
+          exportForm.action = "/export/playlist";
+          exportForm.target = "download-frame";
+          exportForm.style.display = "none";
+
+          const formatInput = document.createElement("input");
+          formatInput.type = "hidden";
+          formatInput.name = "format";
+          formatInput.value = format;
+          exportForm.appendChild(formatInput);
+
+          const playlistInput = document.createElement("input");
+          playlistInput.type = "hidden";
+          playlistInput.name = "playlist_id";
+          playlistInput.value = playlistID;
+          exportForm.appendChild(playlistInput);
+
+          document.body.appendChild(exportForm);
+          exportForm.submit();
+          exportForm.remove();
+
+          clearSingleExportFallbackTimer();
+          singleExportFallbackTimer = window.setTimeout(function () {
+            if (!singlePlaylistExportRunning) {
+              return;
+            }
+
+            waitingForFrameLoad = false;
+            singlePlaylistExportRunning = false;
+            setSinglePlaylistButtonsDisabled(false);
+            playlistsStatus.textContent = "Playlist export submitted.";
+            window.setTimeout(function () {
+              window.location.reload();
+            }, 800);
+          }, 20000);
+        }
+
+        closeBtn.addEventListener("click", function () {
+          overlay.classList.remove("show");
+          resetOverlay();
+        });
+
+        if (loadPlaylistsBtn) {
+          loadPlaylistsBtn.addEventListener("click", function () {
+            void loadPlaylists();
+          });
+        }
+
+        if (playlistsBody) {
+          playlistsBody.addEventListener("click", function (event) {
+            const target = event.target;
+            if (!(target instanceof HTMLButtonElement)) {
+              return;
+            }
+            if (target.dataset.singleExport !== "1") {
+              return;
+            }
+
+            const playlistID = target.dataset.playlistId || "";
+            const format = target.dataset.format || "json";
+            if (!playlistID) {
+              return;
+            }
+
+            submitSinglePlaylistExport(playlistID, format);
+          });
+        }
+
+        if (downloadFrame) {
+          downloadFrame.addEventListener("load", function () {
+            if (!waitingForFrameLoad) {
+              return;
+            }
+
+            waitingForFrameLoad = false;
+            singlePlaylistExportRunning = false;
+            clearSingleExportFallbackTimer();
+            setSinglePlaylistButtonsDisabled(false);
+            playlistsStatus.textContent = "Playlist export completed.";
+            window.setTimeout(function () {
+              window.location.reload();
+            }, 800);
+          });
+        }
+
+        form.addEventListener("submit", async function (event) {
+          event.preventDefault();
+          if (running) {
+            return;
+          }
+
+          const submitter = event.submitter;
+          const format =
+            submitter && submitter.dataset && submitter.dataset.format
+              ? submitter.dataset.format
+              : "json";
+
+          running = true;
+          setButtonsDisabled(true);
+          resetOverlay();
+          overlay.classList.add("show");
+
+          try {
+            const response = await fetch("/api/exports/start", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Accept: "application/json",
+              },
+              credentials: "same-origin",
+              body: new URLSearchParams({ format: format }).toString(),
+            });
+
+            if (!response.ok) {
+              throw new Error(await response.text());
+            }
+
+            const job = await response.json();
+            await pollJob(job.id);
+            pollTimer = window.setInterval(async function () {
+              if (!running) {
+                stopPolling();
+                return;
+              }
+              try {
+                await pollJob(job.id);
+              } catch (error) {
+                stopPolling();
+                running = false;
+                setButtonsDisabled(false);
+                errorEl.textContent = "Failed to fetch export status.";
+                closeBtn.style.display = "inline-block";
+              }
+            }, 1200);
+          } catch (error) {
+            running = false;
+            setButtonsDisabled(false);
+            errorEl.textContent = "Failed to start export.";
+            closeBtn.style.display = "inline-block";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
