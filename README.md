@@ -33,6 +33,7 @@ SPOTIFY_CLIENT_ID="your-client-id"
 SPOTIFY_REDIRECT_URI="http://127.0.0.1:8080/api/spotify/callback"
 # Optional with PKCE:
 # SPOTIFY_CLIENT_SECRET="your-client-secret"
+# SPOTIFY_MARKET="IS" # optional override
 ```
 
 ## Spotify Callback URI
@@ -62,13 +63,15 @@ export SPOTIFY_REDIRECT_URI="http://127.0.0.1:8080/api/spotify/callback"
 export PORT="8080"
 # Optional:
 # export SPOTIFY_CLIENT_SECRET="optional-secret"
+# export SPOTIFY_MARKET="IS" # optional override
 # export DUMPIFY_DATA_DIR="data"
-# export SPOTIFY_SCOPES="playlist-read-private playlist-read-collaborative"
+# export SPOTIFY_SCOPES="playlist-read-private playlist-read-collaborative user-read-private user-read-email"
 # export DUMPIFY_ENV_FILES=".env .env.local"
 # export DUMPIFY_ADDR=":8080" # explicit override (wins over PORT)
 ```
 
 Spotify auth default uses Authorization Code with PKCE (`S256`), so `SPOTIFY_CLIENT_SECRET` is optional.
+`SPOTIFY_MARKET` controls the market query for playlist items. If omitted, Dumpify uses the authenticated user's country from Spotify profile (`/me`). If neither is available, playlist export requests fail.
 
 ## Run
 

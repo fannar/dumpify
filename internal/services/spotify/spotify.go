@@ -28,14 +28,23 @@ const (
 	apiBaseURL   = "https://api.spotify.com/v1"
 	playlistsURL = apiBaseURL + "/me/playlists?limit=50"
 
-	maxRateLimitRetries = 6
+	playlistItemsPageLimit = 50
+	maxRateLimitRetries    = 6
 )
+
+var requiredScopes = []string{
+	"playlist-read-private",
+	"playlist-read-collaborative",
+	"user-read-private",
+	"user-read-email",
+}
 
 type Config struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURI  string
 	Scopes       []string
+	Market       string
 }
 
 type Service struct {
@@ -58,10 +67,8 @@ func New(cfg Config) (*Service, error) {
 		return nil, errors.New("spotify redirect uri must include a callback path")
 	}
 
-	scopes := cfg.Scopes
-	if len(scopes) == 0 {
-		scopes = []string{"playlist-read-private", "playlist-read-collaborative"}
-	}
+	scopes := mergedScopes(cfg.Scopes)
+	market := strings.ToUpper(strings.TrimSpace(cfg.Market))
 
 	var pkceSecret [32]byte
 	if _, err := rand.Read(pkceSecret[:]); err != nil {
@@ -74,6 +81,7 @@ func New(cfg Config) (*Service, error) {
 			ClientSecret: cfg.ClientSecret,
 			RedirectURI:  cfg.RedirectURI,
 			Scopes:       scopes,
+			Market:       market,
 		},
 		httpClient: &http.Client{Timeout: 20 * time.Second},
 		callback:   u.Path,
@@ -127,16 +135,54 @@ func (s *Service) CurrentUser(ctx context.Context, token domain.AuthToken) (doma
 		return domain.User{}, domain.AuthToken{}, err
 	}
 
+	user, err := s.fetchCurrentUser(ctx, fresh.AccessToken)
+	if err != nil {
+		return domain.User{}, domain.AuthToken{}, err
+	}
+	return user, fresh, nil
+}
+
+func (s *Service) fetchCurrentUser(ctx context.Context, accessToken string) (domain.User, error) {
 	var me struct {
 		ID          string `json:"id"`
 		DisplayName string `json:"display_name"`
 		Email       string `json:"email"`
+		Country     string `json:"country"`
+		Product     string `json:"product"`
+		URI         string `json:"uri"`
+		Followers   struct {
+			Total int `json:"total"`
+		} `json:"followers"`
+		ExternalURLs struct {
+			Spotify string `json:"spotify"`
+		} `json:"external_urls"`
+		Images []struct {
+			URL string `json:"url"`
+		} `json:"images"`
 	}
-	if err := s.getJSON(ctx, apiBaseURL+"/me", fresh.AccessToken, &me); err != nil {
-		return domain.User{}, domain.AuthToken{}, err
+	if err := s.getJSON(ctx, apiBaseURL+"/me", accessToken, &me); err != nil {
+		return domain.User{}, err
 	}
 
-	return domain.User{ID: me.ID, DisplayName: me.DisplayName, Email: me.Email}, fresh, nil
+	imageURL := ""
+	for _, img := range me.Images {
+		if strings.TrimSpace(img.URL) != "" {
+			imageURL = img.URL
+			break
+		}
+	}
+
+	return domain.User{
+		ID:          me.ID,
+		DisplayName: me.DisplayName,
+		Email:       me.Email,
+		Country:     me.Country,
+		Product:     me.Product,
+		SpotifyURL:  me.ExternalURLs.Spotify,
+		URI:         me.URI,
+		Followers:   me.Followers.Total,
+		ImageURL:    imageURL,
+	}, nil
 }
 
 func (s *Service) ListPlaylists(ctx context.Context, token domain.AuthToken) ([]domain.Playlist, domain.AuthToken, error) {
@@ -163,7 +209,20 @@ func (s *Service) DumpPlaylist(ctx context.Context, token domain.AuthToken, play
 		return domain.Playlist{}, domain.AuthToken{}, err
 	}
 
-	playlist, err := s.fetchPlaylist(ctx, fresh.AccessToken, strings.TrimSpace(playlistID))
+	userCountry := ""
+	if s.cfg.Market == "" {
+		user, err := s.fetchCurrentUser(ctx, fresh.AccessToken)
+		if err != nil {
+			return domain.Playlist{}, domain.AuthToken{}, err
+		}
+		userCountry = user.Country
+	}
+	market, err := s.effectiveMarket(userCountry)
+	if err != nil {
+		return domain.Playlist{}, domain.AuthToken{}, err
+	}
+
+	playlist, err := s.fetchPlaylist(ctx, fresh.AccessToken, strings.TrimSpace(playlistID), market)
 	if err != nil {
 		return domain.Playlist{}, domain.AuthToken{}, err
 	}
@@ -173,6 +232,10 @@ func (s *Service) DumpPlaylist(ctx context.Context, token domain.AuthToken, play
 
 func (s *Service) DumpPlaylists(ctx context.Context, token domain.AuthToken, onProgress func(services.DumpProgress)) (domain.PlaylistDump, domain.AuthToken, error) {
 	user, freshToken, err := s.CurrentUser(ctx, token)
+	if err != nil {
+		return domain.PlaylistDump{}, domain.AuthToken{}, err
+	}
+	market, err := s.effectiveMarket(user.Country)
 	if err != nil {
 		return domain.PlaylistDump{}, domain.AuthToken{}, err
 	}
@@ -202,7 +265,7 @@ func (s *Service) DumpPlaylists(ctx context.Context, token domain.AuthToken, onP
 
 	for i := range playlists {
 		emitProgress(playlists[i].Name, "", "")
-		fullPlaylist, err := s.fetchPlaylist(ctx, freshToken.AccessToken, playlists[i].ID)
+		fullPlaylist, err := s.fetchPlaylist(ctx, freshToken.AccessToken, playlists[i].ID, market)
 		if err != nil {
 			var apiErr *spotifyAPIError
 			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
@@ -362,13 +425,8 @@ func (s *Service) fetchPlaylists(ctx context.Context, accessToken string) ([]dom
 	return playlists, nil
 }
 
-func (s *Service) fetchPlaylist(ctx context.Context, accessToken, playlistID string) (domain.Playlist, error) {
-	u, _ := url.Parse(apiBaseURL)
-	u.Path = path.Join(u.Path, "playlists", playlistID)
-	q := u.Query()
-	q.Set("additional_types", "track")
-	u.RawQuery = q.Encode()
-	endpoint := u.String()
+func (s *Service) fetchPlaylist(ctx context.Context, accessToken, playlistID, market string) (domain.Playlist, error) {
+	endpoint := playlistMetadataEndpoint(playlistID)
 
 	var payload struct {
 		ID            string `json:"id"`
@@ -381,8 +439,6 @@ func (s *Service) fetchPlaylist(ctx context.Context, accessToken, playlistID str
 		Owner         struct {
 			ID string `json:"id"`
 		} `json:"owner"`
-		Items  *spotifyTrackPage `json:"items"`
-		Tracks *spotifyTrackPage `json:"tracks"`
 	}
 	if err := s.getJSON(ctx, endpoint, accessToken, &payload); err != nil {
 		return domain.Playlist{}, err
@@ -393,8 +449,6 @@ func (s *Service) fetchPlaylist(ctx context.Context, accessToken, playlistID str
 		pub = *payload.Public
 	}
 
-	initialPage := firstTrackPage(payload.Items, payload.Tracks)
-
 	playlist := domain.Playlist{
 		ID:            payload.ID,
 		Name:          payload.Name,
@@ -404,17 +458,19 @@ func (s *Service) fetchPlaylist(ctx context.Context, accessToken, playlistID str
 		Collaborative: payload.Collaborative,
 		SnapshotID:    payload.SnapshotID,
 		URI:           payload.URI,
-		Tracks:        parseSpotifyTrackItems(initialPage.Items),
 	}
 
-	next := initialPage.Next
-	for next != "" {
-		page, err := s.fetchTrackPage(ctx, accessToken, next)
+	offset := 0
+	for {
+		page, err := s.fetchTrackPage(ctx, accessToken, playlistItemsEndpoint(playlistID, offset, market))
 		if err != nil {
 			return domain.Playlist{}, err
 		}
 		playlist.Tracks = append(playlist.Tracks, parseSpotifyTrackItems(page.Items)...)
-		next = page.Next
+		if len(page.Items) < playlistItemsPageLimit {
+			break
+		}
+		offset += playlistItemsPageLimit
 	}
 
 	return playlist, nil
@@ -428,44 +484,44 @@ func (s *Service) fetchTrackPage(ctx context.Context, accessToken, endpoint stri
 	return page, nil
 }
 
-func firstTrackPage(items, tracks *spotifyTrackPage) spotifyTrackPage {
-	if items != nil {
-		return *items
-	}
-	if tracks != nil {
-		return *tracks
-	}
-	return spotifyTrackPage{}
+func playlistMetadataEndpoint(playlistID string) string {
+	u, _ := url.Parse(apiBaseURL)
+	u.Path = path.Join(u.Path, "playlists", playlistID)
+	q := u.Query()
+	q.Set("fields", "id,name,description,collaborative,public,snapshot_id,uri,owner(id)")
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func playlistItemsEndpoint(playlistID string, offset int, market string) string {
+	u, _ := url.Parse(apiBaseURL)
+	u.Path = path.Join(u.Path, "playlists", playlistID, "items")
+	q := u.Query()
+	q.Set("limit", strconv.Itoa(playlistItemsPageLimit))
+	q.Set("offset", strconv.Itoa(offset))
+	q.Set("market", market)
+	q.Set("fields", "items(item(name,album(name),artists(name)))")
+	q.Set("additional_types", "track")
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func parseSpotifyTrackItems(items []spotifyTrackItem) []domain.Track {
 	out := make([]domain.Track, 0, len(items))
 	for _, item := range items {
-		if item.Track == nil {
+		if item.Item == nil {
 			continue
 		}
 
-		artists := make([]string, 0, len(item.Track.Artists))
-		for _, ar := range item.Track.Artists {
+		artists := make([]string, 0, len(item.Item.Artists))
+		for _, ar := range item.Item.Artists {
 			artists = append(artists, ar.Name)
 		}
 
-		addedAt := time.Time{}
-		if item.AddedAt != "" {
-			if ts, err := time.Parse(time.RFC3339, item.AddedAt); err == nil {
-				addedAt = ts
-			}
-		}
-
 		out = append(out, domain.Track{
-			ID:         item.Track.ID,
-			Name:       item.Track.Name,
-			Artists:    artists,
-			Album:      item.Track.Album.Name,
-			DurationMS: item.Track.DurationMS,
-			URI:        item.Track.URI,
-			AddedAt:    addedAt,
-			AddedBy:    item.AddedBy.ID,
+			Name:    item.Item.Name,
+			Artists: artists,
+			Album:   item.Item.Album.Name,
 		})
 	}
 	return out
@@ -473,15 +529,10 @@ func parseSpotifyTrackItems(items []spotifyTrackItem) []domain.Track {
 
 type spotifyTrackPage struct {
 	Items []spotifyTrackItem `json:"items"`
-	Next  string             `json:"next"`
 }
 
 type spotifyTrackItem struct {
-	AddedAt string `json:"added_at"`
-	AddedBy struct {
-		ID string `json:"id"`
-	} `json:"added_by"`
-	Track *spotifyTrack `json:"track"`
+	Item *spotifyTrack `json:"item"`
 }
 
 type spotifyTrack struct {
@@ -621,4 +672,42 @@ func (s *Service) codeVerifier(state string) string {
 func codeChallenge(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func mergedScopes(configured []string) []string {
+	if len(configured) == 0 {
+		return append([]string(nil), requiredScopes...)
+	}
+
+	out := make([]string, 0, len(configured)+len(requiredScopes))
+	seen := map[string]struct{}{}
+	add := func(scope string) {
+		scope = strings.TrimSpace(scope)
+		if scope == "" {
+			return
+		}
+		if _, ok := seen[scope]; ok {
+			return
+		}
+		seen[scope] = struct{}{}
+		out = append(out, scope)
+	}
+
+	for _, scope := range configured {
+		add(scope)
+	}
+	for _, scope := range requiredScopes {
+		add(scope)
+	}
+	return out
+}
+
+func (s *Service) effectiveMarket(userCountry string) (string, error) {
+	if market := strings.ToUpper(strings.TrimSpace(s.cfg.Market)); market != "" {
+		return market, nil
+	}
+	if country := strings.ToUpper(strings.TrimSpace(userCountry)); country != "" {
+		return country, nil
+	}
+	return "", errors.New("spotify market is not configured and user country is unavailable")
 }

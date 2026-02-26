@@ -6,7 +6,7 @@ GO := go
 GOFLAGS := -trimpath
 LDFLAGS := -s -w
 
-.PHONY: all test clean build build-macos build-linux release help
+.PHONY: all test clean build build-macos build-linux release run help
 
 all: build
 
@@ -16,6 +16,7 @@ help:
 	@echo "  build-macos  Build macOS binaries (amd64, arm64)"
 	@echo "  build-linux  Build Linux binaries (amd64, arm64)"
 	@echo "  release      Build macOS + Linux binaries"
+	@echo "  run          Run the app locally"
 	@echo "  test         Run go tests"
 	@echo "  clean        Remove dist artifacts"
 
@@ -40,3 +41,6 @@ build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(APP_NAME)-linux-arm64 $(CMD_PATH)
 
 release: build-macos build-linux
+
+run:
+	$(GO) run $(CMD_PATH)

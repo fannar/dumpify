@@ -14,6 +14,12 @@ type User struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	Email       string `json:"email,omitempty"`
+	Country     string `json:"country,omitempty"`
+	Product     string `json:"product,omitempty"`
+	SpotifyURL  string `json:"spotify_url,omitempty"`
+	URI         string `json:"uri,omitempty"`
+	Followers   int    `json:"followers,omitempty"`
+	ImageURL    string `json:"image_url,omitempty"`
 }
 
 type Track struct {

@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Dumpify</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxMTExMTEiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMiIgZmlsbD0iIzFkYjk1NCIvPgogIDxwYXRoIGQ9Ik0xOCAyNWM5LTMgMTktMiAyOCAzIiBzdHJva2U9IiMwYjBiMGIiIHN0cm9rZS13aWR0aD0iMy4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz4KICA8cGF0aCBkPSJNMTkgMzFjOC0yIDE2LTEgMjQgMyIgc3Ryb2tlPSIjMGIwYjBiIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgogIDxwYXRoIGQ9Ik0yMCAzN2M2LTEgMTIgMCAxOCAyIiBzdHJva2U9IiMwYjBiMGIiIHN0cm9rZS13aWR0aD0iMi44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz4KICA8cGF0aCBkPSJNMzIgMTN2MjciIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz4KICA8cGF0aCBkPSJNMjUgMzRsNyA4IDctOCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4K"
+    />
     <style>
       :root {
         --bg: #f6f6f1;
@@ -39,6 +44,17 @@
         margin: 0 0 0.35rem;
         font-size: 1.9rem;
         letter-spacing: 0.02em;
+      }
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+      .title-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        flex: 0 0 auto;
       }
       p {
         margin: 0.3rem 0;
@@ -157,7 +173,15 @@
   <body>
     <main class="wrap">
       <section class="card">
-        <h1>Dumpify</h1>
+        <h1 class="title-row">
+          <img
+            class="title-icon"
+            src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxMTExMTEiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMiIgZmlsbD0iIzFkYjk1NCIvPgogIDxwYXRoIGQ9Ik0xOCAyNWM5LTMgMTktMiAyOCAzIiBzdHJva2U9IiMwYjBiMGIiIHN0cm9rZS13aWR0aD0iMy4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz4KICA8cGF0aCBkPSJNMTkgMzFjOC0yIDE2LTEgMjQgMyIgc3Ryb2tlPSIjMGIwYjBiIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgogIDxwYXRoIGQ9Ik0yMCAzN2M2LTEgMTIgMCAxOCAyIiBzdHJva2U9IiMwYjBiMGIiIHN0cm9rZS13aWR0aD0iMi44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz4KICA8cGF0aCBkPSJNMzIgMTN2MjciIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz4KICA8cGF0aCBkPSJNMjUgMzRsNyA4IDctOCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4K"
+            alt=""
+            aria-hidden="true"
+          />
+          <span>Dumpify</span>
+        </h1>
         <p>Export your playlists from Spotify into JSON or CSV.</p>
       </section>
 
@@ -172,6 +196,42 @@
         <p class="mono">
           provider={{.Account.Provider}} user_id={{.Account.User.ID}}
         </p>
+        <p class="mono">
+          display_name={{if
+          .Account.User.DisplayName}}{{.Account.User.DisplayName}}{{else}}(not
+          set){{end}} email={{if
+          .Account.User.Email}}{{.Account.User.Email}}{{else}}(not
+          granted){{end}}
+        </p>
+        <p class="mono">
+          country={{if
+          .Account.User.Country}}{{.Account.User.Country}}{{else}}(not
+          granted){{end}} product={{if
+          .Account.User.Product}}{{.Account.User.Product}}{{else}}(not
+          granted){{end}} followers={{.Account.User.Followers}}
+        </p>
+        {{if .Account.User.SpotifyURL}}
+        <p class="mono">
+          spotify_profile=<a
+            href="{{.Account.User.SpotifyURL}}"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{.Account.User.SpotifyURL}}</a
+          >
+        </p>
+        {{end}} {{if .Account.User.URI}}
+        <p class="mono">spotify_uri={{.Account.User.URI}}</p>
+        {{end}} {{if .Account.User.ImageURL}}
+        <p>
+          <img
+            src="{{.Account.User.ImageURL}}"
+            alt="Spotify profile image"
+            width="64"
+            height="64"
+            style="border-radius: 999px; border: 1px solid var(--border)"
+          />
+        </p>
+        {{end}}
         <p class="mono">
           granted_scopes={{if
           .Account.Token.Scope}}{{.Account.Token.Scope}}{{else}}(unknown){{end}}
@@ -332,7 +392,9 @@
         }
 
         function setSinglePlaylistButtonsDisabled(disabled) {
-          const rowButtons = document.querySelectorAll("[data-single-export='1']");
+          const rowButtons = document.querySelectorAll(
+            "[data-single-export='1']",
+          );
           for (const btn of rowButtons) {
             btn.disabled = disabled;
           }
@@ -418,7 +480,12 @@
         }
 
         async function loadPlaylists() {
-          if (!loadPlaylistsBtn || !playlistsStatus || !playlistsWrap || !playlistsBody) {
+          if (
+            !loadPlaylistsBtn ||
+            !playlistsStatus ||
+            !playlistsWrap ||
+            !playlistsBody
+          ) {
             return;
           }
 

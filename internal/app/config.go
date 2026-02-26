@@ -18,6 +18,7 @@ type Config struct {
 	SpotifyClientSecret string
 	SpotifyRedirectURI  string
 	SpotifyScopes       []string
+	SpotifyMarket       string
 }
 
 func LoadConfig() (Config, error) {
@@ -40,6 +41,7 @@ func LoadConfig() (Config, error) {
 		SpotifyClientSecret: strings.TrimSpace(os.Getenv("SPOTIFY_CLIENT_SECRET")),
 		SpotifyRedirectURI:  strings.TrimSpace(os.Getenv("SPOTIFY_REDIRECT_URI")),
 		SpotifyScopes:       parseScopes(os.Getenv("SPOTIFY_SCOPES")),
+		SpotifyMarket:       strings.ToUpper(strings.TrimSpace(os.Getenv("SPOTIFY_MARKET"))),
 	}
 	return cfg, nil
 }

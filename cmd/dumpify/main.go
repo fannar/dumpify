@@ -40,6 +40,7 @@ func main() {
 			ClientSecret: cfg.SpotifyClientSecret,
 			RedirectURI:  cfg.SpotifyRedirectURI,
 			Scopes:       cfg.SpotifyScopes,
+			Market:       cfg.SpotifyMarket,
 		})
 		if err != nil {
 			log.Fatalf("configure spotify provider: %v", err)
